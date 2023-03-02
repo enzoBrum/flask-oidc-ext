@@ -4,6 +4,8 @@ import sys
 
 from setuptools import setup
 
+__VERSION__ = "1.4.5"
+
 # This check is to make sure we checkout docs/_themes before running sdist
 if not os.path.exists("./docs/_themes/README"):
     print("Please make sure you have docs/_themes checked out while running setup.py!")
@@ -31,7 +33,7 @@ setup(
     url="https://github.com/svintit/flask-oidc-ext",
     author="Erica Ehrhardt, Patrick Uiterwijk, Traian Svinti",
     author_email="traian.svinti@gmail.com",
-    version="1.4.5",
+    version=__VERSION__,
     packages=["flask_oidc_ext"],
     install_requires=[
         "Flask",
