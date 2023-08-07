@@ -1,3 +1,4 @@
+import pytest
 from pkg_resources import resource_filename, resource_stream
 import json
 import time
@@ -10,9 +11,8 @@ except ImportError:
     from mock import Mock, patch
 
 from six.moves.urllib.parse import urlsplit, parse_qs, urlencode
-from nose.tools import nottest
 
-from app import create_app
+from .app import create_app
 
 
 last_request = None
@@ -88,17 +88,24 @@ class MockHttp(object):
             raise Exception("Non-recognized path %s requested" % path)
 
 
-@nottest
-def make_test_client():
+@pytest.fixture(scope="function", params=[{
+            "SECRET_KEY": "SEEEKRIT",
+            "TESTING": True,
+            "OIDC_CLIENT_SECRETS": resource_filename(__name__, "client_secrets.json"),
+        }, {
+            "SECRET_KEY": "SEEEKRIT",
+            "TESTING": True,
+            "OIDC_CLIENT_SECRETS": resource_filename(__name__, "client_secrets.json"),
+            "OIDC_ENCRYPT_TOKEN": True,
+            "PUBLIC_KEY": open("public_key.pem").read(),
+            "PRIVATE_KEY": open("private_key.pem").read()
+        }])
+def test_client(request):
     """
     :return: A Flask test client for the test app, and the mocks it uses.
     """
     app = create_app(
-        {
-            "SECRET_KEY": "SEEEKRIT",
-            "TESTING": True,
-            "OIDC_CLIENT_SECRETS": resource_filename(__name__, "client_secrets.json"),
-        },
+        request.param,
         {},
     )
     test_client = app.test_client()
@@ -122,11 +129,10 @@ def callback_url_for(response):
 
 @patch("time.time", Mock(return_value=time.time()))
 @patch("httplib2.Http", MockHttp)
-def test_signin():
+def test_signin(test_client):
     """
     Happy path authentication test.
     """
-    test_client = make_test_client()
 
     # make an unauthenticated request,
     # which should result in a redirect to the IdP
@@ -161,11 +167,10 @@ def test_signin():
 
 
 @patch("httplib2.Http", MockHttp)
-def test_refresh():
+def test_refresh(test_client):
     """
     Test token expiration and refresh.
     """
-    test_client = make_test_client()
 
     with patch("time.time", Mock(return_value=time.time())) as time_1:
         # authenticate and get an ID token cookie
@@ -184,11 +189,10 @@ def test_refresh():
         ], "App should have tried to refresh credentials"
 
 
-def _check_api_token_handling(api_path):
+def _check_api_token_handling(api_path, test_client):
     """
     Test API token acceptance.
     """
-    test_client = make_test_client()
 
     # Test without a token
     resp = test_client.get(api_path)
@@ -229,17 +233,16 @@ def _check_api_token_handling(api_path):
 
 
 @patch("httplib2.Http", MockHttp)
-def test_api_token():
-    _check_api_token_handling("/api")
+def test_api_token(test_client):
+    _check_api_token_handling("/api", test_client)
 
 
 @patch("httplib2.Http", MockHttp)
-def test_api_token_with_external_rendering():
-    _check_api_token_handling("/external_api")
+def test_api_token_with_external_rendering(test_client):
+    _check_api_token_handling("/external_api", test_client)
 
 
-def test_validate_token_return_false():
-    test_client = make_test_client()
+def test_validate_token_return_false(test_client):
 
     from .app import oidc
 
