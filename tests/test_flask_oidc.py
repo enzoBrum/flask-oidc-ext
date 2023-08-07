@@ -97,8 +97,7 @@ class MockHttp(object):
             "TESTING": True,
             "OIDC_CLIENT_SECRETS": resource_filename(__name__, "client_secrets.json"),
             "OIDC_ENCRYPT_TOKEN": True,
-            "PUBLIC_KEY": open("public_key.pem").read(),
-            "PRIVATE_KEY": open("private_key.pem").read()
+            "ENCRYPTION_KEY": open("encryption.key", "rb").read(),
         }])
 def test_client(request):
     """

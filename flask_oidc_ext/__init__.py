@@ -232,10 +232,9 @@ class OpenIDConnect(object):
         self.extra_data_serializer = JsonWebSignature()
 
         if app.config['OIDC_ENCRYPT_TOKEN']:
-            self.encryption_algorithm = {'alg': 'RSA-OAEP', 'enc': 'A256GCM'}
+            self.encryption_algorithm = {'alg': 'A256GCMKW', 'enc': 'A256GCM'}
             self.cookie_encryptor = JsonWebEncryption()
-            self.private_key = app.config["PRIVATE_KEY"]
-            self.public_key = app.config["PUBLIC_KEY"]
+            self.encryption_key = app.config["ENCRYPTION_KEY"]
 
         try:
             self.credentials_store = app.config["OIDC_CREDENTIALS_STORE"]
@@ -416,7 +415,7 @@ class OpenIDConnect(object):
                 return None
             
             if current_app.config['OIDC_ENCRYPT_TOKEN']:
-                id_token_cookie = self.cookie_encryptor.deserialize_compact(id_token_cookie, self.private_key)['payload']
+                id_token_cookie = self.cookie_encryptor.deserialize_compact(id_token_cookie, self.encryption_key)['payload']
 
             id_token_deserialized = self.cookie_serializer.deserialize_compact(id_token_cookie, self.secret)
             return json.loads(id_token_deserialized['payload'])
@@ -462,7 +461,7 @@ class OpenIDConnect(object):
                 signed_id_token = self.cookie_serializer.serialize_compact(self.signing_algorithm, json.dumps(g.oidc_id_token), self.secret).decode("utf-8")
 
                 if current_app.config['OIDC_ENCRYPT_TOKEN']:
-                    signed_id_token = self.cookie_encryptor.serialize_compact(self.encryption_algorithm, signed_id_token, self.public_key)
+                    signed_id_token = self.cookie_encryptor.serialize_compact(self.encryption_algorithm, signed_id_token, self.encryption_key)
 
                 response.set_cookie(
                     current_app.config["OIDC_ID_TOKEN_COOKIE_NAME"],
