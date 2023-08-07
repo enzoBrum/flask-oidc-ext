@@ -46,6 +46,6 @@ Extension list
 - Token caching added: https://github.com/svintit/flask-oidc-ext/pull/9
 - Better error handling: https://github.com/svintit/flask-oidc-ext/pull/5
 - Useful helper functions added `get_token` and for clearing specific tokens
--  Added option to encrypt token stored on the browser ``OIDC_ENCRYPT_TOKEN``.  
+-  Added an option to encrypt the access token stored on the browser ``OIDC_ENCRYPT_TOKEN``.  
    This adds the ability to specify both an encryption key, labeled as ``PUBLIC_KEY``, 
    and a decryption key, known as ``PRIVATE_KEY``.
