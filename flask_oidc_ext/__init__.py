@@ -33,7 +33,7 @@ import logging
 from warnings import warn
 import calendar
 
-from authlib.jose import JsonWebSignature
+from authlib.jose import JsonWebSignature, JsonWebEncryption
 from authlib.jose.errors import (
     DecodeError,
     BadSignatureError,
@@ -198,6 +198,7 @@ class OpenIDConnect(object):
         app.config.setdefault("OVERWRITE_REDIRECT_URI", False)
         app.config.setdefault("OIDC_EXTRA_REQUEST_AUTH_PARAMS", {})
         app.config.setdefault("OIDC_EXTRA_REQUEST_HEADERS", {})
+        app.config.setdefault("OIDC_ENCRYPT_TOKEN", False)
         # Configuration for resource servers
         app.config.setdefault("OIDC_RESOURCE_SERVER_ONLY", False)
         app.config.setdefault("OIDC_RESOURCE_CHECK_AUD", False)
@@ -229,6 +230,12 @@ class OpenIDConnect(object):
         self.secret = app.config["SECRET_KEY"]
         self.cookie_serializer = JsonWebSignature()
         self.extra_data_serializer = JsonWebSignature()
+
+        if app.config['OIDC_ENCRYPT_TOKEN']:
+            self.encryption_algorithm = {'alg': 'RSA-OAEP', 'enc': 'A256GCM'}
+            self.cookie_encryptor = JsonWebEncryption()
+            self.private_key = app.config["PRIVATE_KEY"]
+            self.public_key = app.config["PUBLIC_KEY"]
 
         try:
             self.credentials_store = app.config["OIDC_CREDENTIALS_STORE"]
@@ -407,13 +414,17 @@ class OpenIDConnect(object):
                 # Do not error if we were unable to get the cookie.
                 # The user can debug this themselves.
                 return None
+            
+            if current_app.config['OIDC_ENCRYPT_TOKEN']:
+                id_token_cookie = self.cookie_encryptor.deserialize_compact(id_token_cookie, self.private_key)['payload']
+
             id_token_deserialized = self.cookie_serializer.deserialize_compact(id_token_cookie, self.secret)
             return json.loads(id_token_deserialized['payload'])
         except BadSignatureError:
             logger.debug("Invalid ID token cookie", exc_info=True)
             return None
         except DecodeError:
-            logger.info("Error checking ID token signature", exc_info=True)
+            logger.info("Error while decrypting or checking ID token signature", exc_info=True)
             return None
 
     def set_cookie_id_token(self, id_token):
@@ -449,6 +460,10 @@ class OpenIDConnect(object):
         if getattr(g, "oidc_id_token_dirty", False):
             if g.oidc_id_token:
                 signed_id_token = self.cookie_serializer.serialize_compact(self.signing_algorithm, json.dumps(g.oidc_id_token), self.secret).decode("utf-8")
+
+                if current_app.config['OIDC_ENCRYPT_TOKEN']:
+                    signed_id_token = self.cookie_encryptor.serialize_compact(self.encryption_algorithm, signed_id_token, self.public_key)
+
                 response.set_cookie(
                     current_app.config["OIDC_ID_TOKEN_COOKIE_NAME"],
                     signed_id_token,
